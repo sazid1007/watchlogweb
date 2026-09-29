@@ -1,60 +1,13 @@
-"use client";
+import Image from "next/image";
+import { notFound } from "next/navigation";
+import MediaCard from "@/components/MediaCard";
+import { getPersonDetail, imageUrl } from "@/lib/tmdb";
 
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import MediaCard from "@/components/discover/MediaCard";
-import { searchByPerson } from "@/hooks/useDiscover";
-import type { MediaResult } from "@/lib/types";
+export default async function ActorPage({ params }: { params: Promise<{ personId: string; personName: string }> }) {
+  const { personId } = await params;
+  const person = await getPersonDetail(personId);
+  if (!person) notFound();
+  const credits = [...(person.combined_credits?.cast ?? []), ...(person.combined_credits?.crew ?? [])].filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index);
 
-export default function ActorPage() {
-  const { personId, personName } = useParams<{ personId?: string; personName?: string }>();
-  const [results, setResults] = useState<MediaResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const decodedName = decodeURIComponent(personName ?? "");
-
-  useEffect(() => {
-    const id = Number(personId ?? "0");
-    if (!Number.isFinite(id) || id <= 0) {
-      setResults([]);
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    void searchByPerson(id, decodedName || "Person")
-      .then((items) => {
-        setResults(items);
-      })
-      .catch((error) => {
-        console.error(error);
-        setResults([]);
-      })
-      .finally(() => setIsLoading(false));
-  }, [decodedName, personId]);
-
-  return (
-    <main className="space-y-6">
-      <header className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-foreground-muted">
-          Actor
-        </p>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">{decodedName || "Actor"}</h1>
-      </header>
-
-      {isLoading ? (
-        <p className="text-sm text-foreground-muted">Loading filmography…</p>
-      ) : results.length === 0 ? (
-        <p className="text-sm text-foreground-muted">No credits found for this person.</p>
-      ) : (
-        <ul className="space-y-2">
-          {results.map((item) => (
-            <li key={`${item.media_type ?? "movie"}-${item.id}`}>
-              <MediaCard media={item} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
-  );
+  return <div className="space-y-12"><p className="eyebrow">Cast profile</p><section className="person-hero">{person.profile_path ? <Image src={imageUrl(person.profile_path, "w500") ?? ""} alt={person.name} fill sizes="220px" className="object-cover" /> : null}<div className="person-copy"><h1 className="hero-title">{person.name}</h1><p className="mt-4 max-w-2xl text-sm leading-7 text-foreground-muted">{person.biography || `${person.name} is known for ${person.known_for_department?.toLowerCase() ?? "their work on screen"}.`}</p><p className="mt-5 text-xs uppercase tracking-[0.14em] text-foreground-muted">{person.place_of_birth ?? ""}</p></div></section>{credits.length ? <section><p className="eyebrow">Selected work</p><h2 className="section-title mb-5">Known for</h2><div className="poster-grid">{credits.slice(0, 12).map((item) => <MediaCard key={`${item.media_type}-${item.id}`} media={item} />)}</div></section> : null}</div>;
 }

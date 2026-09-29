@@ -1,391 +1,43 @@
-"use client";
-
 import Image from "next/image";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import CastCard from "@/components/detail/CastCard";
-import InfoRow from "@/components/detail/InfoRow";
-import SectionHeader from "@/components/detail/SectionHeader";
-import SimilarMediaCard from "@/components/detail/SimilarMediaCard";
-import VideoCard from "@/components/detail/VideoCard";
-import { useDetail } from "@/hooks/useDetail";
-import { tmdbImageUrl } from "@/lib/tmdb";
-import { getTitle, getYear, type MediaType } from "@/lib/types";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import DetailActions from "@/components/DetailActions";
+import MediaCard from "@/components/MediaCard";
+import { getMediaDetail, imageUrl } from "@/lib/tmdb";
+import { getTitle, getYear } from "@/lib/types";
 
-const STAR_VALUES = Array.from({ length: 10 }, (_, index) => index + 1);
+export default async function DetailPage({ params }: { params: Promise<{ mediaType: string; mediaId: string }> }) {
+  const { mediaType, mediaId } = await params;
+  if (mediaType !== "movie" && mediaType !== "tv") notFound();
+  const media = await getMediaDetail(mediaType, mediaId);
+  if (!media) notFound();
 
-export default function DetailPage() {
-  const { mediaType, mediaId } = useParams<{ mediaType?: string; mediaId?: string }>();
-  const router = useRouter();
-  const type: MediaType = mediaType === "movie" || mediaType === "tv" ? mediaType : "movie";
-  const id = Number(mediaId ?? "0");
+  const title = getTitle(media);
+  const backdrop = imageUrl(media.backdrop_path ?? media.poster_path, "original");
+  const recommendations = media.recommendations?.results?.length ? media.recommendations.results : media.similar?.results ?? [];
+  const crew = media.credits?.crew ?? [];
+  const directors = crew.filter((person) => person.job === "Director").map((person) => person.name).slice(0, 3);
+  const writers = crew.filter((person) => ["Writer", "Screenplay", "Story", "Creator"].includes(person.job)).map((person) => person.name).slice(0, 4);
+  const keywords = media.keywords?.keywords ?? media.keywords?.results ?? [];
+  const trailers = media.videos?.results.filter((video) => video.site === "YouTube" && ["Trailer", "Teaser"].includes(video.type)).slice(0, 4) ?? [];
+  const runtime = media.runtime ?? media.episode_run_time?.[0];
 
-  const { detail, similar, isLoading, localEntry, toggleWatchlist, saveRating, error } =
-    useDetail(type, id);
-  const [isRatingOpen, setIsRatingOpen] = useState(false);
-  const [draftRating, setDraftRating] = useState(localEntry.rating);
+  return <div className="space-y-16">
+    <Link href="/" className="back-link">← Back to Home</Link>
+    <section className="detail-hero detail-hero-expanded">
+      <div className="relative min-h-[330px] overflow-hidden rounded-[4px] bg-surface lg:min-h-[570px]">{backdrop ? <Image src={backdrop} alt="" fill sizes="(max-width: 1024px) 100vw, 65vw" className="object-cover" /> : null}<div className="hero-wash" /></div>
+      <div className="flex flex-col justify-end py-4 lg:pb-8"><p className="eyebrow">{mediaType === "tv" ? "Series" : "Feature film"} · {getYear(media)}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-6xl">{title}</h1><div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-foreground-muted"><span className="rating-star">★ {media.vote_average?.toFixed(1) ?? "—"}</span><span>{media.original_language?.toUpperCase()}</span><span>{media.status ?? "Released"}</span></div><p className="mt-5 max-w-xl text-sm leading-7 text-foreground-muted">{media.tagline ? `“${media.tagline}”` : media.overview ?? "No synopsis has been added yet."}</p><div className="mt-5 flex flex-wrap gap-2">{media.genres?.slice(0, 5).map((genre) => <span key={genre.id} className="tag-pill">{genre.name}</span>)}</div><DetailActions media={{ ...media, media_type: mediaType }} title={title} /></div>
+    </section>
+    <section className="detail-section"><p className="eyebrow">Storyline</p><h2 className="section-title">The story</h2><p className="storyline">{media.overview ?? "The storyline for this title is not available yet."}</p></section>
+    {mediaType === "tv" ? <section className="detail-section"><p className="eyebrow">Series information</p><h2 className="section-title">Across the seasons</h2><div className="info-grid"><InfoItem label="Seasons" value={String(media.number_of_seasons ?? "—")} /><InfoItem label="Episodes" value={String(media.number_of_episodes ?? "—")} /><InfoItem label="Episode runtime" value={runtime ? `${runtime} min` : "—"} /><InfoItem label="Last air date" value={media.last_episode_to_air?.air_date ?? "—"} /><InfoItem label="Status" value={media.status ?? "—"} /><InfoItem label="Created by" value={media.created_by?.map((creator) => creator.name).join(", ") || "—"} /></div></section> : null}
+    <section className="detail-section"><p className="eyebrow">Credits & details</p><h2 className="section-title">Behind the title</h2><div className="info-grid"><InfoItem label="Director" value={directors.join(", ") || "—"} /><InfoItem label="Writers" value={writers.join(", ") || "—"} /><InfoItem label="Runtime" value={runtime ? `${runtime} min` : "—"} /><InfoItem label="Release date" value={media.release_date ?? media.first_air_date ?? "—"} /><InfoItem label="Production" value={media.production_companies?.map((company) => company.name).slice(0, 2).join(", ") || "—"} /><InfoItem label="Spoken languages" value={media.spoken_languages?.map((language) => language.english_name ?? language.name).join(", ") || "—"} /></div></section>
+    {media.credits?.cast?.length ? <section className="detail-section"><p className="eyebrow">The people in it</p><h2 className="section-title mb-5">Cast</h2><div className="cast-grid">{media.credits.cast.slice(0, 12).map((person) => <Link key={`${person.id}-${person.credit_id}`} href={`/actor/${person.id}/${encodeURIComponent(person.name)}`} className="cast-card">{person.profile_path ? <Image src={imageUrl(person.profile_path, "w342") ?? ""} alt={person.name} fill sizes="100px" className="object-cover" /> : <div className="cast-placeholder">{person.name.slice(0, 1)}</div>}<div className="cast-overlay"><strong>{person.name}</strong><span>{person.character ?? "Cast"}</span></div></Link>)}</div></section> : null}
+    {trailers.length ? <section className="detail-section"><p className="eyebrow">Watch next</p><h2 className="section-title mb-5">Video & Trailers</h2><div className="video-grid">{trailers.map((video) => <a key={video.key} href={`https://www.youtube.com/watch?v=${video.key}`} target="_blank" rel="noreferrer" className="video-card"><Image src={`https://img.youtube.com/vi/${video.key}/hqdefault.jpg`} alt={video.name} fill sizes="(max-width: 700px) 100vw, 33vw" className="object-cover" /><span>▶</span><strong>{video.name}</strong></a>)}</div></section> : null}
+    {keywords.length ? <section className="detail-section"><p className="eyebrow">Index</p><h2 className="section-title mb-4">Tags</h2><div className="flex flex-wrap gap-2">{keywords.slice(0, 14).map((keyword) => <span key={keyword.id} className="tag-pill">{keyword.name}</span>)}</div></section> : null}
+    {recommendations.length ? <section className="detail-section"><p className="eyebrow">Keep looking</p><h2 className="section-title mb-5">Similar Suggestions</h2><div className="poster-grid">{recommendations.slice(0, 6).map((item) => <MediaCard key={`${item.media_type}-${item.id}`} media={{ ...item, media_type: item.media_type ?? mediaType }} />)}</div></section> : null}
+  </div>;
+}
 
-  useEffect(() => {
-    setDraftRating(localEntry.rating);
-  }, [localEntry.rating]);
-
-  if (isLoading) {
-    return <div className="py-12 text-center text-foreground-muted">Loading details…</div>;
-  }
-
-  if (error) {
-    return (
-      <div className="py-12 text-center">
-        <p className="mb-3 text-sm text-foreground-muted">Error loading media.</p>
-        <button
-          type="button"
-          onClick={() => {
-            setRetryKey((k) => k + 1);
-            window.location.reload();
-          }}
-          className="px-3 py-2 rounded bg-accent text-white"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  if (!detail) {
-    return <div className="py-12 text-center text-foreground-muted">Media not found.</div>;
-  }
-
-  const title = getTitle(detail) || "Untitled";
-  const year = getYear(detail);
-  const voteAverage = detail.vote_average != null ? Number(detail.vote_average).toFixed(1) : "N/A";
-  const heroImage = tmdbImageUrl(detail.backdrop_path ?? detail.poster_path);
-  const logo = detail.images?.logos?.[0];
-  const seasonOrRuntime =
-    type === "movie"
-      ? detail.runtime
-        ? `${detail.runtime} min`
-        : "Runtime unavailable"
-      : detail.number_of_seasons
-        ? `${detail.number_of_seasons} seasons`
-        : "TV details unavailable";
-
-  const cast = detail.credits?.cast?.slice(0, 10) ?? [];
-  const crew = detail.credits?.crew ?? [];
-  const director = crew.find((member) => member.job === "Director")?.name ?? "Not listed";
-  const writers = crew
-    .filter((member) => member.job === "Writer" || member.job === "Screenplay")
-    .map((member) => member.name)
-    .slice(0, 3);
-  const providers = detail["watch/providers"]?.results?.US?.flatrate ?? [];
-  const videos = (detail.videos?.results ?? [])
-    .filter(
-      (video) =>
-        video.site === "YouTube" &&
-        (video.type === "Trailer" || video.type === "Teaser"),
-    )
-    .slice(0, 4);
-  const tags = (detail.keywords?.keywords ?? detail.keywords?.results ?? []).slice(0, 15);
-
-  const handleSaveRating = () => {
-    saveRating(draftRating);
-    setIsRatingOpen(false);
-  };
-
-  return (
-    <div className="relative -mx-4 pb-10">
-      <header className="relative h-[430px] overflow-hidden">
-        <div className="absolute inset-0">
-          {heroImage ? (
-            <Image
-              src={heroImage}
-              alt=""
-              fill
-              priority
-              sizes="(max-width: 768px) 100vw"
-              className="object-cover"
-            />
-          ) : null}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-background/45 to-background" />
-        </div>
-
-        <div className="relative z-10 flex h-full flex-col justify-between px-4 pt-6">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur-sm transition-transform hover:scale-105"
-            aria-label="Go back"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" aria-hidden="true">
-              <path d="M15 18 9 12l6-6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-
-          <div className="pb-6">
-            {logo?.file_path ? (
-              <div className="max-w-[260px]">
-                <Image
-                  src={tmdbImageUrl(logo.file_path) ?? ""}
-                  alt={title}
-                  width={260}
-                  height={90}
-                  className="max-h-[90px] w-auto object-contain"
-                />
-              </div>
-            ) : (
-              <h1 className="max-w-[16ch] text-3xl font-black leading-none tracking-tight text-white">
-                {title}
-              </h1>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <main className="relative z-10 -mt-8 rounded-t-3xl border-t border-glass-border bg-background px-4 pt-6">
-        <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-foreground-muted">
-          {year ? <span>{year}</span> : null}
-          {year ? <span>•</span> : null}
-          <span>{seasonOrRuntime}</span>
-          <span>•</span>
-          <div className="flex items-center gap-1 text-foreground">
-            <svg viewBox="0 0 24 24" className="h-4 w-4 fill-accent text-accent" aria-hidden="true">
-              <path d="m12 2.7 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.8-5.4 2.8 1-6.1L3.2 9.1l6.1-.9L12 2.7Z" />
-            </svg>
-            <span>{voteAverage}/10</span>
-            <span className="text-foreground-muted">({detail.vote_count ?? 0})</span>
-          </div>
-          <div className="ml-auto flex items-center gap-1 rounded-full border border-glass-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground">
-            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-accent" aria-hidden="true" />
-            {localEntry.rating > 0 ? `Rated ${localEntry.rating}/10` : "Unrated"}
-          </div>
-        </div>
-
-        <div className="mb-5 flex flex-wrap gap-2">
-          {(detail.genres ?? []).map((genre) => (
-            <span
-              key={genre.id}
-              className="rounded-full border border-glass-border bg-surface px-3 py-1 text-xs font-medium text-foreground-muted"
-            >
-              {genre.name}
-            </span>
-          ))}
-        </div>
-
-        <div className="mb-6 flex gap-3">
-          <button
-            type="button"
-            onClick={toggleWatchlist}
-            className={`flex-1 rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${
-              localEntry.watchlist
-                ? "bg-accent text-white"
-                : "border border-glass-border bg-surface text-foreground"
-            }`}
-          >
-            {localEntry.watchlist ? "On Playlist" : "Save to List"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsRatingOpen(true)}
-            className="flex-1 rounded-full border border-glass-border bg-surface px-4 py-2.5 text-sm font-semibold text-foreground"
-          >
-            {localEntry.rating > 0 ? `Rated ${localEntry.rating}` : "Rate Title"}
-          </button>
-        </div>
-
-        {providers.length > 0 ? (
-          <section className="mb-8">
-            <SectionHeader title="Where to Watch" />
-            <div className="mt-4 flex flex-wrap gap-3">
-              {providers.map((provider) => {
-                const logo = tmdbImageUrl(provider.logo_path);
-                return (
-                  <div key={provider.provider_id} className="w-[72px] text-center">
-                    <div className="mx-auto mb-2 flex h-[50px] w-[50px] items-center justify-center overflow-hidden rounded-xl bg-surface">
-                      {logo ? (
-                        <Image
-                          src={logo}
-                          alt={provider.provider_name}
-                          width={50}
-                          height={50}
-                          sizes="50px"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : null}
-                    </div>
-                    <p className="text-[10px] text-foreground-muted">{provider.provider_name}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ) : null}
-
-        <section className="mb-8 space-y-3">
-          <SectionHeader title="Storyline" />
-          <p className="text-sm leading-6 text-foreground-muted">
-            {detail.overview || "No overview available."}
-          </p>
-        </section>
-
-        {type === "tv" ? (
-          <section className="mb-8 space-y-3">
-            <SectionHeader title="TV Show Info" />
-            <InfoRow label="Episodes" value={detail.number_of_episodes ?? "Unknown"} />
-            <InfoRow
-              label="Last Air Date"
-              value={detail.last_episode_to_air?.air_date ?? "Not available"}
-            />
-            <InfoRow
-              label="Episode Runtime"
-              value={
-                detail.episode_run_time != null ? `${detail.episode_run_time} min` : "Unknown"
-              }
-            />
-          </section>
-        ) : null}
-
-        <section className="mb-8">
-          <SectionHeader title="Details" />
-          <div className="mt-3 space-y-1">
-            <InfoRow label="Director" value={director} />
-            <InfoRow
-              label="Writers"
-              value={writers.length > 0 ? writers.join(", ") : "Not listed"}
-            />
-            <InfoRow label="Status" value={detail.status ?? "Unknown"} />
-            <InfoRow
-              label="Original Language"
-              value={detail.original_language?.toUpperCase() ?? "Unknown"}
-            />
-            <InfoRow
-              label="Popularity"
-              value={detail.popularity != null ? detail.popularity.toFixed(1) : "Unknown"}
-            />
-            <InfoRow
-              label="Production countries"
-              value={detail.production_countries?.map((country) => country.name).join(", ") || "Not listed"}
-            />
-            <InfoRow
-              label="Companies"
-              value={detail.production_companies?.map((company) => company.name).join(", ") || "Not listed"}
-            />
-          </div>
-        </section>
-
-        <section className="mb-8">
-          <SectionHeader title="Cast" />
-          <div className="mt-4 flex gap-4 overflow-x-auto pb-1">
-            {cast.map((member) => (
-              <CastCard key={member.id} cast={member} />
-            ))}
-          </div>
-        </section>
-
-        {videos.length > 0 ? (
-          <section className="mb-8">
-            <SectionHeader title="Videos & Trailers" />
-            <div className="mt-4 flex gap-4 overflow-x-auto pb-1">
-              {videos.map((video) => (
-                <VideoCard key={video.key} video={video} />
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {tags.length > 0 ? (
-          <section className="mb-8">
-            <SectionHeader title="Tags" />
-            <div className="mt-4 flex flex-wrap gap-2">
-              {tags.map((tag) => (
-                <a
-                  key={tag.id}
-                  href={`/tag/${tag.id}/${encodeURIComponent(tag.name)}`}
-                  className="rounded-full border border-glass-border bg-surface px-3 py-1.5 text-xs text-foreground-muted transition-colors hover:border-accent/70 hover:text-accent"
-                >
-                  #{tag.name}
-                </a>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {similar.length > 0 ? (
-          <section className="mb-8">
-            <SectionHeader title="Similar Suggestions" />
-            <div className="mt-4 flex gap-4 overflow-x-auto pb-1">
-              {similar.slice(0, 10).map((item) => (
-                <SimilarMediaCard key={`${item.media_type ?? type}-${item.id}`} media={item} />
-              ))}
-            </div>
-          </section>
-        ) : null}
-      </main>
-
-      {isRatingOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-t-3xl border border-glass-border bg-background px-5 pb-5 pt-4 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <span className="text-sm font-medium uppercase tracking-[0.2em] text-foreground-muted">
-                Your Rating
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsRatingOpen(false)}
-                className="text-sm text-foreground-muted"
-                aria-label="Close rating sheet"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="mb-5 flex items-center justify-center gap-2 text-2xl font-bold text-accent">
-              <span>{draftRating}</span>
-              <span className="text-lg">/10</span>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex justify-center gap-3">
-                {STAR_VALUES.slice(0, 5).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setDraftRating(value)}
-                    className={`text-2xl ${value <= draftRating ? "text-accent" : "text-foreground-muted"}`}
-                    aria-label={`Rate ${value} out of 10`}
-                  >
-                    ★
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-center gap-3">
-                {STAR_VALUES.slice(5).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setDraftRating(value)}
-                    className={`text-2xl ${value <= draftRating ? "text-accent" : "text-foreground-muted"}`}
-                    aria-label={`Rate ${value} out of 10`}
-                  >
-                    ★
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSaveRating}
-              disabled={draftRating === 0}
-              className={`mt-6 w-full rounded-full px-4 py-3 text-sm font-semibold transition-colors ${
-                draftRating === 0
-                  ? "cursor-not-allowed bg-surface text-foreground-muted"
-                  : "bg-accent text-white"
-              }`}
-            >
-              Save to Journal
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
+function InfoItem({ label, value }: { label: string; value: string }) {
+  return <div className="info-item"><span>{label}</span><strong>{value}</strong></div>;
 }

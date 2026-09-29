@@ -1,114 +1,45 @@
-"use client";
+import Image from "next/image";
+import Link from "next/link";
+import MediaCard from "@/components/MediaCard";
+import RecentExplored from "@/components/RecentExplored";
+import { getHomeRows, getSearchResults, imageUrl } from "@/lib/tmdb";
+import { getTitle, mediaHref } from "@/lib/types";
+import type { MediaResult } from "@/lib/types";
 
-/* --------------------------------------------------------------------------
-   Discover — the home screen.
-
-   Layout (top to bottom): fixed search bar, "Watch Next" row (only while the
-   query is blank), headline, category chips, vertical result list.
-   All fetching lives in hooks/useDiscover.
-   -------------------------------------------------------------------------- */
-import CategoryChip from "@/components/discover/CategoryChip";
-import EmptyState from "@/components/discover/EmptyState";
-import FeaturedCard from "@/components/discover/FeaturedCard";
-import LoadingSpinner from "@/components/discover/LoadingSpinner";
-import MediaCard from "@/components/discover/MediaCard";
-import SearchBarHeader from "@/components/discover/SearchBarHeader";
-import { CATEGORIES, useDiscover } from "@/hooks/useDiscover";
-import { getMediaType } from "@/lib/types";
-
-const IDLE_HEADLINE = "Discover Your Next Favorite Shows.";
-
-export default function DiscoverPage() {
-  const {
-    results,
-    watchNextResults,
-    isLoading,
-    searchQuery,
-    setSearchQuery,
-    selectedCategory,
-    selectCategory,
-    error,
-    retry,
-  } = useDiscover();
-
-  const isSearching = searchQuery.trim().length > 0;
-  const headline = isSearching
-    ? "Search Results"
-    : selectedCategory === "All"
-      ? IDLE_HEADLINE
-      : `${selectedCategory} Movies`;
-
-  const showWatchNext = !isSearching && watchNextResults.length > 0;
+export default async function DiscoverPage({ searchParams }: { searchParams: Promise<{ q?: string; view?: string }> }) {
+  const { q, view } = await searchParams;
+  const { trending, movies, shows } = await getHomeRows();
+  const searchResults = q ? await getSearchResults(q) : [];
+  const activeItems = view === "movies" ? movies : view === "tv" ? shows : trending;
+  const hero = activeItems[0] ?? trending[0];
+  const heroImage = imageUrl(hero?.backdrop_path ?? hero?.poster_path, "original");
+  const latestItems = activeItems.slice(3);
 
   return (
-    <>
-      {/* Fixed search bar. Its height (h-[85px]) = pt-6 (24) + h-12 input (48)
-          + pb-3 (12) + 1px border; <main> repeats it as top padding so the
-          content keeps AppShell's usual 24px gap below the bar. */}
-      <header className="fixed inset-x-0 top-0 z-40 h-[85px] border-b border-glass-border bg-background/85 backdrop-blur-xl">
-        <div className="mx-auto w-full max-w-2xl px-4 pt-6 pb-3">
-          <SearchBarHeader value={searchQuery} onChange={setSearchQuery} />
+    <div className="space-y-14">
+      {q ? <section><p className="eyebrow">Search results</p><h1 className="section-title mt-2">Titles matching “{q}”</h1><div className="poster-grid mt-6">{searchResults.length ? searchResults.slice(0, 12).map((item) => <MediaCard key={`${item.media_type}-${item.id}`} media={item} />) : <p className="text-sm text-foreground-muted">No titles found. Try another search.</p>}</div></section> : null}
+      <section className="hero-panel">
+        {heroImage ? <Image src={heroImage} alt="" fill priority sizes="100vw" className="object-cover object-center" /> : null}
+        <div className="hero-wash" />
+        <div className="relative max-w-2xl px-6 py-12 sm:px-10 sm:py-20">
+          <p className="eyebrow">Featured item</p>
+          <h1 className="hero-title">{getTitle(hero)}</h1>
+          <p className="mt-4 max-w-lg text-sm leading-6 text-white/70 sm:text-base">{hero?.overview ?? "A considered place to find your next great watch."}</p>
+          <Link href={hero ? mediaHref(hero) : "/journal"} className="primary-button mt-7 inline-flex">Explore title <span aria-hidden="true">↗</span></Link>
         </div>
-      </header>
+      </section>
 
-      <main className="pt-[85px]">
-        {showWatchNext ? (
-          <section aria-label="Watch Next" className="mb-6">
-            <ul className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-1">
-              {watchNextResults.map((item) => (
-                <li key={`${getMediaType(item)}-${item.id}`}>
-                  <FeaturedCard media={item} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
+      <section>
+        <div className="mb-5 flex items-end justify-between"><div><p className="eyebrow">A living shelf</p><h2 className="section-title">Featured Items</h2></div><span className="text-xs uppercase tracking-[0.18em] text-foreground-muted">Updated weekly</span></div>
+        <div className="poster-grid feature-grid">{activeItems.slice(0, 6).map((item, index) => <MediaCard key={`${item.media_type}-${item.id}`} media={item} featured={index === 0} />)}</div>
+      </section>
 
-        <h1 className="mb-4 text-2xl font-bold leading-tight tracking-tight text-foreground">
-          {headline}
-        </h1>
-
-        <nav aria-label="Categories" className="mb-6">
-          <ul className="-mx-4 flex gap-2 overflow-x-auto px-4">
-            {CATEGORIES.map((category) => (
-              <li key={category}>
-                <CategoryChip
-                  label={category}
-                  isActive={selectedCategory === category}
-                  onClick={() => selectCategory(category)}
-                />
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        <section aria-label="Results" aria-busy={isLoading}>
-          {isLoading ? (
-            <LoadingSpinner />
-          ) : error ? (
-            <div className="py-12 text-center">
-              <p className="mb-3 text-sm text-foreground-muted">Error loading results.</p>
-              <button
-                type="button"
-                onClick={retry}
-                className="px-3 py-2 rounded bg-accent text-white"
-              >
-                Retry
-              </button>
-            </div>
-          ) : results.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <ul className="space-y-2">
-              {results.map((item) => (
-                <li key={`${getMediaType(item)}-${item.id}`}>
-                  <MediaCard media={item} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </main>
-    </>
+      <MediaRow title="Latest Films & Shows" items={latestItems.length ? latestItems : [...movies.slice(3), ...shows.slice(3)]} />
+      <RecentExplored />
+    </div>
   );
+}
+
+function MediaRow({ title, items }: { title: string; items: MediaResult[] }) {
+  return <section><div className="mb-5 flex items-end justify-between"><div><p className="eyebrow">WatchLog picks</p><h2 className="section-title">{title}</h2></div><Link href="/journal" className="text-xs text-accent hover:text-white">Open journal →</Link></div><div className="poster-grid">{items.slice(0, 6).map((item) => <MediaCard key={`${item.media_type}-${item.id}`} media={item} />)}</div></section>;
 }
