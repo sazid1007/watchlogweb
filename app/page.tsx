@@ -1,9 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
+import FeaturedCarousel from "@/components/FeaturedCarousel";
 import MediaCard from "@/components/MediaCard";
 import RecentExplored from "@/components/RecentExplored";
-import { getHomeRows, getSearchResults, imageUrl } from "@/lib/tmdb";
-import { getTitle, mediaHref } from "@/lib/types";
+import { getHomeRows, getSearchResults } from "@/lib/tmdb";
 import type { MediaResult } from "@/lib/types";
 
 export default async function DiscoverPage({ searchParams }: { searchParams: Promise<{ q?: string; view?: string }> }) {
@@ -11,31 +10,25 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
   const { trending, movies, shows } = await getHomeRows();
   const searchResults = q ? await getSearchResults(q) : [];
   const activeItems = view === "movies" ? movies : view === "tv" ? shows : trending;
-  const hero = activeItems[0] ?? trending[0];
-  const heroImage = imageUrl(hero?.backdrop_path ?? hero?.poster_path, "original");
-  const latestItems = activeItems.slice(3);
+  const latestItems = activeItems.slice(5);
+  const rankedShows = [...shows].sort((left, right) => (right.vote_average ?? 0) - (left.vote_average ?? 0));
+  const watchOffset = rankedShows.length ? new Date().getDate() % rankedShows.length : 0;
+  const watchNext = [...rankedShows.slice(watchOffset), ...rankedShows.slice(0, watchOffset)].slice(0, 6);
+  const categories = [
+    { name: "Action picks", items: movies.filter((item) => item.genre_ids?.includes(28)) },
+    { name: "Drama picks", items: [...movies, ...shows].filter((item) => item.genre_ids?.includes(18)) },
+    { name: "Comedy picks", items: [...movies, ...shows].filter((item) => item.genre_ids?.includes(35)) },
+  ];
 
   return (
     <div className="space-y-14">
       {q ? <section><p className="eyebrow">Search results</p><h1 className="section-title mt-2">Titles matching “{q}”</h1><div className="poster-grid mt-6">{searchResults.length ? searchResults.slice(0, 12).map((item) => <MediaCard key={`${item.media_type}-${item.id}`} media={item} />) : <p className="text-sm text-foreground-muted">No titles found. Try another search.</p>}</div></section> : null}
-      <section className="hero-panel">
-        {heroImage ? <Image src={heroImage} alt="" fill priority sizes="100vw" className="object-cover object-center" /> : null}
-        <div className="hero-wash" />
-        <div className="relative max-w-2xl px-6 py-12 sm:px-10 sm:py-20">
-          <p className="eyebrow">Featured item</p>
-          <h1 className="hero-title">{getTitle(hero)}</h1>
-          <p className="mt-4 max-w-lg text-sm leading-6 text-white/70 sm:text-base">{hero?.overview ?? "A considered place to find your next great watch."}</p>
-          <Link href={hero ? mediaHref(hero) : "/journal"} className="primary-button mt-7 inline-flex">Explore title <span aria-hidden="true">↗</span></Link>
-        </div>
-      </section>
+      <FeaturedCarousel items={activeItems} />
 
-      <section>
-        <div className="mb-5 flex items-end justify-between"><div><p className="eyebrow">A living shelf</p><h2 className="section-title">Featured Items</h2></div><span className="text-xs uppercase tracking-[0.18em] text-foreground-muted">Updated weekly</span></div>
-        <div className="poster-grid feature-grid">{activeItems.slice(0, 6).map((item, index) => <MediaCard key={`${item.media_type}-${item.id}`} media={item} featured={index === 0} />)}</div>
-      </section>
-
-      <MediaRow title="Latest Films & Shows" items={latestItems.length ? latestItems : [...movies.slice(3), ...shows.slice(3)]} />
+      <MediaRow title="Watch Next" items={watchNext} />
+      <MediaRow title="Latest Films & Shows" items={latestItems.length ? latestItems : [...movies.slice(5), ...shows.slice(5)]} />
       <RecentExplored />
+      {categories.map((category) => <MediaRow key={category.name} title={category.name} items={category.items.length ? category.items : activeItems.slice(0, 6)} />)}
     </div>
   );
 }

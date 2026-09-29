@@ -9,7 +9,7 @@ import { imageUrl } from "@/lib/tmdb";
 export default function MediaCard({ media, featured = false }: { media: MediaResult; featured?: boolean }) {
   const type = getMediaType(media);
   const title = getTitle(media);
-  const poster = imageUrl(media.poster_path, "w342");
+  const poster = imageUrl(featured ? (media.poster_path ?? media.backdrop_path) : media.poster_path, featured ? "w500" : "w342");
 
   function rememberExploration() {
     if (!title) return;
@@ -24,16 +24,17 @@ export default function MediaCard({ media, featured = false }: { media: MediaRes
 
   return (
     <Link href={mediaHref({ ...media, media_type: type })} onClick={rememberExploration} className={`group block min-w-0 ${featured ? "col-span-2" : ""}`}>
-      <div className={`relative overflow-hidden rounded-[4px] bg-surface ${featured ? "aspect-[16/9]" : "aspect-[2/3]"}`}>
-        {poster ? <Image src={poster} alt={title} fill sizes={featured ? "(max-width: 700px) 100vw, 66vw" : "(max-width: 700px) 42vw, 16vw"} className="object-cover transition duration-500 group-hover:scale-105" /> : <div className="flex h-full items-end p-3 text-sm text-foreground-muted">{title}</div>}
+      <div className={`relative overflow-hidden rounded-[4px] bg-surface ${featured ? "aspect-[2/3]" : "aspect-[2/3]"}`}>
+        {poster ? <Image src={poster} alt={title} fill sizes={featured ? "(max-width: 700px) 76vw, 310px" : "(max-width: 700px) 42vw, 16vw"} className="object-cover transition duration-500 group-hover:scale-105" /> : <div className="flex h-full items-end p-3 text-sm text-foreground-muted">{title}</div>}
+        {featured ? <><div className="featured-rating">★ {media.vote_average?.toFixed(1) ?? "—"}</div><div className="featured-caption"><strong>{title}</strong><span>{getYear(media)}</span></div></> : null}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-3 pt-12 opacity-0 transition group-hover:opacity-100">
-          <p className="truncate text-sm font-semibold text-white">{title}</p>
+          <p className="truncate text-sm font-semibold text-white">{featured ? "Explore title ↗" : title}</p>
         </div>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-foreground-muted">
+      {!featured ? <div className="mt-2 flex items-center justify-between gap-2 text-xs text-foreground-muted">
         <span className="truncate">{title}</span>
         <span>{getYear(media)}</span>
-      </div>
+      </div> : null}
     </Link>
   );
 }
