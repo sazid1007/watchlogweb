@@ -10,7 +10,12 @@
    absolute URL with `tmdbImageUrl()`.
    -------------------------------------------------------------------------- */
 
-import type { MediaListResponse, MediaType, PersonCombinedCredits } from "./types";
+import type {
+  MediaDetailResponse,
+  MediaListResponse,
+  MediaType,
+  PersonCombinedCredits,
+} from "./types";
 
 export const TMDB_API_BASE_URL = "https://api.themoviedb.org/3/";
 export const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
@@ -82,4 +87,24 @@ export function discoverByKeyword(
 /** `person/{id}/combined_credits` — a person's full filmography (cast + crew). */
 export function getPersonCredits(personId: number): Promise<PersonCombinedCredits> {
   return tmdbGet<PersonCombinedCredits>(`person/${personId}/combined_credits`);
+}
+
+/** `movie/{id}` or `tv/{id}` with the related, credits, and media metadata. */
+export function getMediaDetail(
+  mediaType: MediaType,
+  id: number,
+): Promise<MediaDetailResponse> {
+  return tmdbGet<MediaDetailResponse>(`${mediaType}/${id}`, {
+    append_to_response:
+      "credits,videos,keywords,recommendations,similar,images,watch/providers",
+    include_image_language: "en,null",
+  });
+}
+
+/** `movie/{id}/similar` or `tv/{id}/similar` — suggested titles for the detail page. */
+export function getSimilarMedia(
+  mediaType: MediaType,
+  id: number,
+): Promise<MediaListResponse> {
+  return tmdbGet<MediaListResponse>(`${mediaType}/${id}/similar`);
 }
