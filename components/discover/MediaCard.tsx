@@ -25,7 +25,7 @@ export default function MediaCard({ media }: MediaCardProps) {
         {poster ? (
           <Image
             src={poster}
-            alt=""
+            alt={getTitle(media)}
             width={80}
             height={120}
             sizes="80px"

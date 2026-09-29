@@ -33,6 +33,7 @@ export function useDetail(mediaType: MediaType, mediaId: number) {
   const [detail, setDetail] = useState<MediaDetailResponse | null>(null);
   const [similar, setSimilar] = useState<MediaResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [localEntry, setLocalEntry] = useState<DetailLocalEntry>(EMPTY_ENTRY);
 
   useEffect(() => {
@@ -73,11 +74,14 @@ export function useDetail(mediaType: MediaType, mediaId: number) {
 
         setDetail(detailResponse);
         setSimilar(normalizedSimilar);
+        setError(null);
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error(error);
         if (isActive) {
           setDetail(null);
           setSimilar([]);
+          setError((error as Error)?.message ?? String(error));
         }
       } finally {
         if (isActive) {
@@ -143,6 +147,7 @@ export function useDetail(mediaType: MediaType, mediaId: number) {
     detail,
     similar,
     isLoading,
+    error,
     localEntry,
     toggleWatchlist,
     saveRating,

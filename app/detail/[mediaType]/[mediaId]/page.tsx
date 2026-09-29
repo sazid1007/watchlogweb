@@ -20,7 +20,7 @@ export default function DetailPage() {
   const type: MediaType = mediaType === "movie" || mediaType === "tv" ? mediaType : "movie";
   const id = Number(mediaId ?? "0");
 
-  const { detail, similar, isLoading, localEntry, toggleWatchlist, saveRating } =
+  const { detail, similar, isLoading, localEntry, toggleWatchlist, saveRating, error } =
     useDetail(type, id);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
   const [draftRating, setDraftRating] = useState(localEntry.rating);
@@ -31,6 +31,24 @@ export default function DetailPage() {
 
   if (isLoading) {
     return <div className="py-12 text-center text-foreground-muted">Loading details…</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="py-12 text-center">
+        <p className="mb-3 text-sm text-foreground-muted">Error loading media.</p>
+        <button
+          type="button"
+          onClick={() => {
+            setRetryKey((k) => k + 1);
+            window.location.reload();
+          }}
+          className="px-3 py-2 rounded bg-accent text-white"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   if (!detail) {

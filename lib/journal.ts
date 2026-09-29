@@ -119,3 +119,45 @@ export function cleanup(): void {
   );
   if (retainedEntries.length !== entries.length) writeEntries(retainedEntries);
 }
+
+/* Helpers for export/import – preserve existing event contract */
+export function exportEntries(): string {
+  return JSON.stringify(readEntries());
+}
+
+export function importEntries(json: string): void {
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (!Array.isArray(parsed)) return;
+
+    // upsert semantics: merge by id, prefer incoming entry values
+    const existing = readEntries();
+    const byId = new Map<number, MediaEntry>(existing.map((e) => [e.id, e]));
+
+    for (const item of parsed) {
+      if (typeof item !== "object" || item === null) continue;
+      const maybe = item as Partial<MediaEntry>;
+      if (!Number.isInteger(maybe.id)) continue;
+
+      const merged: MediaEntry = {
+        id: maybe.id as number,
+        mediaType: (maybe.mediaType as MediaEntry["mediaType"]) ?? "movie",
+        title: (maybe.title as string) ?? "Untitled",
+        posterPath: (maybe.posterPath as string) ?? null,
+        backdropPath: (maybe.backdropPath as string) ?? null,
+        genre: (maybe.genre as string) ?? "",
+        year: (maybe.year as string) ?? "",
+        rating: (typeof maybe.rating === "number" ? maybe.rating : 0),
+        reviewText: (maybe.reviewText as string) ?? "",
+        isOnWatchlist: !!maybe.isOnWatchlist,
+        dateAdded: (maybe.dateAdded as string) ?? new Date().toISOString(),
+      };
+
+      byId.set(merged.id, merged);
+    }
+
+    writeEntries(Array.from(byId.values()));
+  } catch {
+    // ignore parse errors
+  }
+}

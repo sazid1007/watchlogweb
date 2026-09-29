@@ -68,6 +68,7 @@ export function useDiscover() {
   const [results, setResults] = useState<MediaResult[]>([]);
   const [watchNextResults, setWatchNextResults] = useState<MediaResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQueryState] = useState("");
   const [selectedCategory, setSelectedCategoryState] = useState<CategoryName>("All");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -83,6 +84,7 @@ export function useDiscover() {
     listSourceRef.current = "remote";
     const sequence = ++sequenceRef.current;
     setIsLoading(true);
+    setError(null);
 
     try {
       const items = await task();
@@ -92,8 +94,11 @@ export function useDiscover() {
       }
     } catch (error) {
       if (sequence === sequenceRef.current && listSourceRef.current === "remote") {
+        // surface the error so the UI can offer a retry
+        // eslint-disable-next-line no-console
         console.error(error);
         setResults([]);
+        setError((error as Error)?.message ?? String(error));
         setIsLoading(false);
       }
     }
@@ -142,13 +147,44 @@ export function useDiscover() {
         if (listSourceRef.current === "trending") {
           setResults(main);
           setIsLoading(false);
+          setError(null);
         }
       } catch (error) {
+        // surface the error for the UI
+        // eslint-disable-next-line no-console
         console.error(error);
         if (listSourceRef.current === "trending") {
           setResults([]);
+          setError((error as Error)?.message ?? String(error));
           setIsLoading(false);
         }
+      }
+    })();
+  }, []);
+
+  const retry = useCallback(() => {
+    // clear error and re-run initial trending load
+    setError(null);
+    listSourceRef.current = "trending";
+    sequenceRef.current += 1;
+
+    void (async () => {
+      try {
+        const trending = await getTrending();
+        const media = normalizeMedia(trending.results);
+        const watchNext = pickWatchNext(media, todayKey());
+        const watchNextKeys = new Set(watchNext.map(listKey));
+        const main = media.filter((item) => !watchNextKeys.has(listKey(item)));
+
+        trendingRef.current = { main };
+        setWatchNextResults(watchNext);
+        setResults(main);
+        setIsLoading(false);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(err);
+        setError((err as Error)?.message ?? String(err));
+        setIsLoading(false);
       }
     })();
   }, []);
@@ -227,12 +263,14 @@ export function useDiscover() {
     results,
     watchNextResults,
     isLoading,
+    error,
     searchQuery,
     setSearchQuery,
     selectedCategory,
     selectCategory,
     searchByPerson,
     searchByTag,
+    retry,
   };
 }
 
