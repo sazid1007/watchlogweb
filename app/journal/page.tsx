@@ -96,8 +96,10 @@ function JournalWishlistCard({ entry }: { entry: MediaEntry }) {
     >
       <div className="relative h-[120px] w-[80px] shrink-0 overflow-hidden rounded-md bg-background">
         {poster ? (
-          <Image src={poster} alt="" fill sizes="80px" className="object-cover" />
-        ) : null}
+          <Image src={poster} alt={entry.title} fill sizes="80px" className="object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-xs text-foreground-muted">No image</div>
+        )}
       </div>
       <div className="min-w-0 flex-1 self-center">
         <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -125,8 +127,10 @@ function JournalRatedCard({ entry }: { entry: MediaEntry }) {
     >
       <div className="relative h-[96px] w-16 shrink-0 overflow-hidden rounded-md bg-background">
         {poster ? (
-          <Image src={poster} alt="" fill sizes="64px" className="object-cover" />
-        ) : null}
+          <Image src={poster} alt={entry.title} fill sizes="64px" className="object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-xs text-foreground-muted">No image</div>
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <h2 className="truncate text-base font-semibold text-foreground">{entry.title}</h2>

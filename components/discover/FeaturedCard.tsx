@@ -25,7 +25,7 @@ export default function FeaturedCard({ media }: FeaturedCardProps) {
         {backdrop ? (
           <Image
             src={backdrop}
-            alt=""
+            alt={getTitle(media)}
             fill
             sizes="300px"
             className="object-cover transition-transform duration-300 group-hover:scale-105"

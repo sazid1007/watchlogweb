@@ -27,6 +27,8 @@ export default function DiscoverPage() {
     setSearchQuery,
     selectedCategory,
     selectCategory,
+    error,
+    retry,
   } = useDiscover();
 
   const isSearching = searchQuery.trim().length > 0;
@@ -83,6 +85,17 @@ export default function DiscoverPage() {
         <section aria-label="Results" aria-busy={isLoading}>
           {isLoading ? (
             <LoadingSpinner />
+          ) : error ? (
+            <div className="py-12 text-center">
+              <p className="mb-3 text-sm text-foreground-muted">Error loading results.</p>
+              <button
+                type="button"
+                onClick={retry}
+                className="px-3 py-2 rounded bg-accent text-white"
+              >
+                Retry
+              </button>
+            </div>
           ) : results.length === 0 ? (
             <EmptyState />
           ) : (
