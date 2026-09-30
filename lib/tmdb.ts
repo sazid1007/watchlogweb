@@ -40,6 +40,28 @@ export async function getHomeRows() {
   };
 }
 
+export async function getCatalogResults(type: MediaType, query: string, page = 1): Promise<MediaListResponse> {
+  const currentPage = Number.isInteger(page) && page > 0 ? page : 1;
+  const trimmed = query.trim();
+  const endpoint = trimmed
+    ? `/search/${type}?query=${encodeURIComponent(trimmed)}&page=${currentPage}`
+    : `/${type}/popular?page=${currentPage}`;
+  const response = await tmdbFetch<MediaListResponse>(endpoint);
+
+  if (!response && !trimmed && currentPage === 1) {
+    const fallback = fallbackMovies.filter((item) => item.media_type === type);
+    return { page: 1, results: fallback, total_pages: 1, total_results: fallback.length };
+  }
+
+  const results = (response?.results ?? []).map((item) => ({ ...item, media_type: type }));
+  return {
+    page: response?.page ?? currentPage,
+    results,
+    total_pages: response?.total_pages ?? 1,
+    total_results: response?.total_results ?? results.length,
+  };
+}
+
 export async function getMediaDetail(type: MediaType, id: string | number) {
   const detail = await tmdbFetch<MediaDetailResponse>(
     `/${type}/${encodeURIComponent(String(id))}?append_to_response=credits,similar,recommendations,watch/providers`,
